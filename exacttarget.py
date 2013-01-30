@@ -439,6 +439,7 @@ class ExactTargetConnection(object):
         headers = {"Content-type": "application/x-www-form-urlencoded", "Content-length": len(data), "Connection": "close"}
 
         req = urllib2.Request(url, data, headers)
+        response = None
 
         try:
             # add timeout support for Python 2.6 and lower
@@ -450,7 +451,10 @@ class ExactTargetConnection(object):
                 response = urllib2.urlopen(req, timeout=self.timeout)
         except urllib2.URLError:
             self.error = "Response timed out";
-            
+            raise Exception("Error: %s, maybe a higher value for timeout is required?" % self.error)
+        
+        if not response:
+            return None
         content = response.read()
         
         try:
