@@ -442,6 +442,28 @@ class ExactTargetConnection(object):
             subscribers.append(s)
         return subscribers
 
+    def email_html_paste(self, email_name, email_subject, email_body):
+        '''
+        Creates an HTML email message.
+
+        Message should be well formed and adhere to rules set in: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Email_Management/Email_Add_HTML_Paste
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>add</action>
+        <sub_action>HTMLPaste</sub_action>
+        <category></category>
+        <email_name>%(name)s</email_name>
+        <email_subject>%(subject)s</email_subject>
+        <email_body><![CDATA[%(body)s]]></email_body>""" % {'name': email_name, 'subject': email_subject, 'body': email_body}
+
+        xml_response = self.make_call(data)
+
+        email_id = xml_response.find('.//emailID')
+
+        return email_id.text if email_id != None else None
+
     def make_call(self, data):
         xml = """<?xml version="1.0" ?>
         <exacttarget>
