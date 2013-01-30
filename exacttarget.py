@@ -76,6 +76,27 @@ class ExactTargetConnection(object):
             attributes.append(a)
         return attributes
 
+    def subscriber_retrieve(self, subscriber_id):
+        '''
+        Retrieves a subscriber given subscriber's id
+        '''
+        data = """
+        <system_name>subscriber</system_name>
+        <action>retrieve</action>
+        <search_type>subid</search_type>
+        <search_value>%(subscriber_id)d</search_value>
+        <search_value2></search_value2>
+        <showChannelID></showChannelID>""" % {'subscriber_id': subscriber_id}
+
+        xml_response = self.make_call(data)
+
+        subscriber = xml_response.find('.//subscriber')
+        s = {}
+        for node in subscriber:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
+
     def subscriber_add(self, list_id, email_address, full_name='', update=True):
         '''
         Add email address to a list
