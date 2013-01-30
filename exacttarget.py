@@ -34,6 +34,9 @@ ENDPOINTS = {
 class ExactTargetError(Exception):
     pass
 
+class ConnectionError(Exception):
+    pass
+
 class ExactTargetConnection(object):
     def __init__(self, username, password, timeout=250, endpoint='default'):
         '''
@@ -464,6 +467,36 @@ class ExactTargetConnection(object):
 
         return email_id.text if email_id != None else None
 
+    def job_send(self, email_id, list_id, from_name='', from_email='', track_links='true', multipart_mime='false', send_date="immediate", test_send="false"):
+        '''
+        Sends an email to a subscriber list or group.
+
+        Method restricted here to only sending to a specific list. (Actual API supports multiple.)
+        '''
+
+        data = """
+        <system_name>job</system_name>
+        <action>send</action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <from_name>%(from_name)s</from_name>
+        <from_email>%(from_email)s</from_email>
+        <additional></additional>
+        <multipart_mime>%(multipart_mime)s</multipart_mime>
+        <track_links>%(track_links)s</track_links>
+        <send_date>%(send_date)s</send_date>
+        <send_time></send_time>
+        <lists>
+            <list>%(listid)d</list>
+        </lists>
+        <suppress></suppress>
+        <test_send>true</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id}
+
+        xml_response = self.make_call(data)
+        job_id = xml_response.find('.//job_description')
+
+        return job_id.text if job_id != None else None
+
     def make_call(self, data):
         xml = """<?xml version="1.0" ?>
         <exacttarget>
@@ -493,7 +526,7 @@ class ExactTargetConnection(object):
                 response = urllib2.urlopen(req, timeout=self.timeout)
         except urllib2.URLError:
             self.error = "Response timed out";
-            raise Exception("Error: %s, maybe a higher value for timeout is required?" % self.error)
+            raise ConnectionError("Error: %s while waiting for response from ExactTarget (maybe a higher value for timeout is required?)" % self.error)
         
         content = response.read()
         
