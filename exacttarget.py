@@ -79,6 +79,8 @@ class ExactTargetConnection(object):
             attributes.append(a)
         return attributes
 
+    ## Subscriber Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Subscriber_Management
+
     def subscriber_retrieve(self, subscriber_id):
         '''
         Retrieves a subscriber given subscriber's id
@@ -267,6 +269,8 @@ class ExactTargetConnection(object):
             subscribers.append(s)
         return subscribers
 
+    ## List Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/List_Management
+
     def list_add(self, name, list_type):
         '''
         Add a new list, returns new list ID
@@ -445,6 +449,9 @@ class ExactTargetConnection(object):
             subscribers.append(s)
         return subscribers
 
+
+    ## Email Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Email_Management
+
     def email_html_paste(self, email_name, email_subject, email_body):
         '''
         Creates an HTML email message.
@@ -466,6 +473,27 @@ class ExactTargetConnection(object):
         email_id = xml_response.find('.//emailID')
 
         return email_id.text if email_id != None else None
+
+    def email_text(self, email_id, email_body):
+        '''
+        Creates the text version of an email.
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>add</action>
+        <sub_action>text</sub_action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <email_body><![CDATA[%(body)s]]></email_body>""" % {'emailid': email_id, 'body': email_body}
+
+        xml_response = self.make_call(data)
+
+        email_resp = xml_response.find('.//email_info')
+
+        return email_resp.text if email_resp != None else None
+
+    ## Jobs (Remote Sending): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Jobs_(Remote_Sending)
 
     def job_send(self, email_id, list_id, from_name='', from_email='', track_links='true', multipart_mime='false', send_date="immediate", test_send="false"):
         '''
@@ -496,6 +524,39 @@ class ExactTargetConnection(object):
         job_id = xml_response.find('.//job_description')
 
         return job_id.text if job_id != None else None
+
+    ## Tracking (Event Data Requests): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Tracking_(Event_Data_Requests)
+    def tracking_retrieve_jobs(self, start_date='', end_date=''):
+        '''
+        Retrieves all jobIDs for emails sent during a specified period.
+
+        Date format needs to be M/D/YYYY H:M:S AM or PM. If left blank, all job ids in account will be returned.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>jobretrieve</action>
+        <sub_action>jobs</sub_action>
+        <search_type>daterange</search_type>
+        <search_value>%(start_date)s</search_value>
+        <search_value2>%(end_date)s</search_value2>""" % {'start_date': start_date, 'end_date': end_date}
+
+        xml_response = self.make_call(data)
+
+        jobs = []
+        for job in xml_response.findall('.//job'):
+            lists_ids = []
+            for list_id in job.findall('.//lists'):
+                lists_ids.append(list_id.find('listID').text)
+            j = {
+                'job_id': job.find('jobID').text,
+                'job_send_date': job.find('jobSendDate').text,
+                'lists': lists_ids,
+            }
+            jobs.append(j)
+        return jobs
+
+    ## Image Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Image_Management
 
     def make_call(self, data):
         xml = """<?xml version="1.0" ?>
