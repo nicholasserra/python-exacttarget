@@ -34,6 +34,9 @@ ENDPOINTS = {
 class ExactTargetError(Exception):
     pass
 
+class ExactTargetValidationError(Exception):
+    pass
+
 class ConnectionError(Exception):
     pass
 
@@ -493,6 +496,75 @@ class ExactTargetConnection(object):
 
         return email_resp.text if email_resp != None else None
 
+    def email_retrieve_all(self, search_type=None, email_name='', start_date='', end_date=''):
+        '''
+        Retrieves all emailIDs in your account.
+
+        You can filter these emailIDs by email name or by a specified data range (date specified in M/D/YYYY)
+        '''
+
+        SEARCH_TYPES = ('emailname', 'daterange', 'emailnameanddaterange')
+
+        if not search_type:
+            search_type = ''
+        elif search_type and search_type not in SEARCH_TYPES:
+            raise ExactTargetValidationError("Search type given invalid, needs to be: emailname or daterange or emailnameanddaterange")
+
+        if start_date and end_date and search_type != 'emailname':
+            #validate date ranges
+            date_nodes = """
+            <daterange>
+              <startdate>%(startdate)s</startdate>
+              <enddate>%(enddate)s</enddate>
+            </daterange>""" % {'startdate': start_date, 'enddate': end_date}
+        else:
+            date_nodes = "<daterange/>"
+
+        data = """
+        <system_name>email</system_name>
+        <action>retrieve</action>
+        <sub_action>all</sub_action>
+        <search_type>%(search_type)s</search_type>
+        <search_value>%(emailname)s</search_value>
+        <search_value2></search_value2>
+        %(daterange)s""" % {'search_type': search_type, 'emailname': email_name, 'daterange': date_nodes}
+
+        xml_response = self.make_call(data)
+
+        emails = []
+
+        for email in xml_response.findall('.//emaillist'):
+            e = {
+                'id': email.find('emailid').text,
+                'name': email.find('emailname').text,
+                'subject': email.find('emailsubject').text,
+                'created_date': email.find('emailcreateddate').text,
+                'category_id': email.find('categoryid').text
+            }
+            emails.append(e)
+
+        return emails
+
+    def email_retrieve_body(self, email_id):
+        '''
+        Retrieves the HTML body of any email (given email id)
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>retrieve</action>
+        <sub_action>htmlemail</sub_action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <search_value2></search_value2>
+        <search_value3></search_value3>""" % {'emailid': email_id}
+
+        xml_response = self.make_call(data)
+
+        email_body = xml_response.find('.//htmlbody')
+
+        return email_body.text if email_body != None else None
+
     ## Jobs (Remote Sending): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Jobs_(Remote_Sending)
 
     def job_send(self, email_id, list_id, from_name='', from_email='', track_links='true', multipart_mime='false', send_date="immediate", test_send="false"):
@@ -526,6 +598,7 @@ class ExactTargetConnection(object):
         return job_id.text if job_id != None else None
 
     ## Tracking (Event Data Requests): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Tracking_(Event_Data_Requests)
+
     def tracking_retrieve_jobs(self, start_date='', end_date=''):
         '''
         Retrieves all jobIDs for emails sent during a specified period.
