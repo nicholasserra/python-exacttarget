@@ -629,7 +629,80 @@ class ExactTargetConnection(object):
             jobs.append(j)
         return jobs
 
-    ## Image Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Image_Management
+    def tracking_retrieve_single_subscriber(self, job_id, subscriber_id):
+        '''
+        Retrieves a single subscriber's tracking data for an email send.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>retrieve</action>
+        <sub_action>single</sub_action>
+        <search_type>jobID</search_type>
+        <search_value>%(jobid)d</search_value>
+        <search_value2>%(subscriberid)d</search_value2>""" % {'jobid': job_id, 'subscriberid': subscriber_id}
+
+        xml_response = self.make_call(data)
+
+        subscriber = xml_response.find('.//subscriber')
+        s = {}
+        for node in subscriber:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
+
+    def tracking_retrieve_summary(self, job_id):
+        '''
+        Retrieves summarized tracking data for an email send.
+
+        You may have additional functionality enabled in your account to search via event_id; swap the search_type to event_id.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>retrieve</action>
+        <sub_action>summary</sub_action>
+        <search_type>jobID</search_type>
+        <search_value>%(jobid)d</search_value>
+        <search_value2></search_value2>""" % {'jobid': job_id}
+
+        xml_response = self.make_call(data)
+
+        summary = xml_response.find('.//emailSummary')
+        s = {}
+        for node in summary:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
+
+    def tracking_retrieve_unsubscribes(self, start_date, end_date):
+        '''
+        Retrieves the subscribers in your account who unsubscribed via an email job send during a specific period.
+        '''
+
+        data = """
+        <system_name>tracking-channel</system_name>
+        <action>retrieve</action>
+        <sub_action>unsubscribe</sub_action>
+        <search_type>daterange</search_type>
+        <search_value>%(startdate)s</search_value>
+        <search_value2>%(enddate)s</search_value2>""" % {'startdate': start_date, 'enddate': end_date}
+
+        xml_response = self.make_call(data)
+
+        unsubscribers = []
+        for unsubscriber in xml_response.findall('.//subscriber'):
+            s = {
+                'email_address': unsubscriber.find('Email__Address').text,
+                'name': unsubscriber.find('Full__Name').text if unsubscriber.find('Full__Name') else '',
+                'email_type': unsubscriber.find('Email__Type').text if unsubscriber.find('Email__Type').text else '',
+                'unsub_date_time': unsubscriber.find('date').text,
+                'interest': unsubscriber.find('interest').text,
+            }
+        unsubscribers.append(s)
+
+        return unsubscribers
+
 
     def make_call(self, data):
         xml = """<?xml version="1.0" ?>
