@@ -34,6 +34,12 @@ ENDPOINTS = {
 class ExactTargetError(Exception):
     pass
 
+class ExactTargetValidationError(Exception):
+    pass
+
+class ConnectionError(Exception):
+    pass
+
 class ExactTargetConnection(object):
     def __init__(self, username, password, timeout=250, endpoint='default'):
         '''
@@ -75,6 +81,29 @@ class ExactTargetConnection(object):
                     a[node.tag] = node.text
             attributes.append(a)
         return attributes
+
+    ## Subscriber Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Subscriber_Management
+
+    def subscriber_retrieve(self, subscriber_id):
+        '''
+        Retrieves a subscriber given subscriber's id
+        '''
+        data = """
+        <system_name>subscriber</system_name>
+        <action>retrieve</action>
+        <search_type>subid</search_type>
+        <search_value>%(subscriber_id)d</search_value>
+        <search_value2></search_value2>
+        <showChannelID></showChannelID>""" % {'subscriber_id': subscriber_id}
+
+        xml_response = self.make_call(data)
+
+        subscriber = xml_response.find('.//subscriber')
+        s = {}
+        for node in subscriber:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
 
     def subscriber_add(self, list_id, email_address, full_name='', update=True):
         '''
@@ -242,6 +271,8 @@ class ExactTargetConnection(object):
             }
             subscribers.append(s)
         return subscribers
+
+    ## List Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/List_Management
 
     def list_add(self, name, list_type):
         '''
@@ -421,6 +452,258 @@ class ExactTargetConnection(object):
             subscribers.append(s)
         return subscribers
 
+
+    ## Email Management: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Email_Management
+
+    def email_html_paste(self, email_name, email_subject, email_body):
+        '''
+        Creates an HTML email message.
+
+        Message should be well formed and adhere to rules set in: http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Email_Management/Email_Add_HTML_Paste
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>add</action>
+        <sub_action>HTMLPaste</sub_action>
+        <category></category>
+        <email_name>%(name)s</email_name>
+        <email_subject>%(subject)s</email_subject>
+        <email_body><![CDATA[%(body)s]]></email_body>""" % {'name': email_name, 'subject': email_subject, 'body': email_body}
+
+        xml_response = self.make_call(data)
+
+        email_id = xml_response.find('.//emailID')
+
+        return email_id.text if email_id != None else None
+
+    def email_text(self, email_id, email_body):
+        '''
+        Creates the text version of an email.
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>add</action>
+        <sub_action>text</sub_action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <email_body><![CDATA[%(body)s]]></email_body>""" % {'emailid': email_id, 'body': email_body}
+
+        xml_response = self.make_call(data)
+
+        email_resp = xml_response.find('.//email_info')
+
+        return email_resp.text if email_resp != None else None
+
+    def email_retrieve_all(self, search_type=None, email_name='', start_date='', end_date=''):
+        '''
+        Retrieves all emailIDs in your account.
+
+        You can filter these emailIDs by email name or by a specified data range (date specified in M/D/YYYY)
+        '''
+
+        SEARCH_TYPES = ('emailname', 'daterange', 'emailnameanddaterange')
+
+        if not search_type:
+            search_type = ''
+        elif search_type and search_type not in SEARCH_TYPES:
+            raise ExactTargetValidationError("Search type given invalid, needs to be: emailname or daterange or emailnameanddaterange")
+
+        if start_date and end_date and search_type != 'emailname':
+            #validate date ranges
+            date_nodes = """
+            <daterange>
+              <startdate>%(startdate)s</startdate>
+              <enddate>%(enddate)s</enddate>
+            </daterange>""" % {'startdate': start_date, 'enddate': end_date}
+        else:
+            date_nodes = "<daterange/>"
+
+        data = """
+        <system_name>email</system_name>
+        <action>retrieve</action>
+        <sub_action>all</sub_action>
+        <search_type>%(search_type)s</search_type>
+        <search_value>%(emailname)s</search_value>
+        <search_value2></search_value2>
+        %(daterange)s""" % {'search_type': search_type, 'emailname': email_name, 'daterange': date_nodes}
+
+        xml_response = self.make_call(data)
+
+        emails = []
+
+        for email in xml_response.findall('.//emaillist'):
+            e = {
+                'id': email.find('emailid').text,
+                'name': email.find('emailname').text,
+                'subject': email.find('emailsubject').text,
+                'created_date': email.find('emailcreateddate').text,
+                'category_id': email.find('categoryid').text
+            }
+            emails.append(e)
+
+        return emails
+
+    def email_retrieve_body(self, email_id):
+        '''
+        Retrieves the HTML body of any email (given email id)
+        '''
+
+        data = """
+        <system_name>email</system_name>
+        <action>retrieve</action>
+        <sub_action>htmlemail</sub_action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <search_value2></search_value2>
+        <search_value3></search_value3>""" % {'emailid': email_id}
+
+        xml_response = self.make_call(data)
+
+        email_body = xml_response.find('.//htmlbody')
+
+        return email_body.text if email_body != None else None
+
+    ## Jobs (Remote Sending): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Jobs_(Remote_Sending)
+
+    def job_send(self, email_id, list_id, from_name='', from_email='', track_links='true', multipart_mime='false', send_date="immediate", test_send="false"):
+        '''
+        Sends an email to a subscriber list or group.
+
+        Method restricted here to only sending to a specific list. (Actual API supports multiple.)
+        '''
+
+        data = """
+        <system_name>job</system_name>
+        <action>send</action>
+        <search_type>emailid</search_type>
+        <search_value>%(emailid)d</search_value>
+        <from_name>%(from_name)s</from_name>
+        <from_email>%(from_email)s</from_email>
+        <additional></additional>
+        <multipart_mime>%(multipart_mime)s</multipart_mime>
+        <track_links>%(track_links)s</track_links>
+        <send_date>%(send_date)s</send_date>
+        <send_time></send_time>
+        <lists>
+            <list>%(listid)d</list>
+        </lists>
+        <suppress></suppress>
+        <test_send>true</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id}
+
+        xml_response = self.make_call(data)
+        job_id = xml_response.find('.//job_description')
+
+        return job_id.text if job_id != None else None
+
+    ## Tracking (Event Data Requests): http://docs.code.exacttarget.com/040_XML_API/XML_API_Calls_and_Sample_Code/Tracking_(Event_Data_Requests)
+
+    def tracking_retrieve_jobs(self, start_date='', end_date=''):
+        '''
+        Retrieves all jobIDs for emails sent during a specified period.
+
+        Date format needs to be M/D/YYYY H:M:S AM or PM. If left blank, all job ids in account will be returned.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>jobretrieve</action>
+        <sub_action>jobs</sub_action>
+        <search_type>daterange</search_type>
+        <search_value>%(start_date)s</search_value>
+        <search_value2>%(end_date)s</search_value2>""" % {'start_date': start_date, 'end_date': end_date}
+
+        xml_response = self.make_call(data)
+
+        jobs = []
+        for job in xml_response.findall('.//job'):
+            lists_ids = []
+            for list_id in job.findall('.//lists'):
+                lists_ids.append(list_id.find('listID').text)
+            j = {
+                'job_id': job.find('jobID').text,
+                'job_send_date': job.find('jobSendDate').text,
+                'lists': lists_ids,
+            }
+            jobs.append(j)
+        return jobs
+
+    def tracking_retrieve_single_subscriber(self, job_id, subscriber_id):
+        '''
+        Retrieves a single subscriber's tracking data for an email send.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>retrieve</action>
+        <sub_action>single</sub_action>
+        <search_type>jobID</search_type>
+        <search_value>%(jobid)d</search_value>
+        <search_value2>%(subscriberid)d</search_value2>""" % {'jobid': job_id, 'subscriberid': subscriber_id}
+
+        xml_response = self.make_call(data)
+
+        subscriber = xml_response.find('.//subscriber')
+        s = {}
+        for node in subscriber:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
+
+    def tracking_retrieve_summary(self, job_id):
+        '''
+        Retrieves summarized tracking data for an email send.
+
+        You may have additional functionality enabled in your account to search via event_id; swap the search_type to event_id.
+        '''
+
+        data = """
+        <system_name>tracking</system_name>
+        <action>retrieve</action>
+        <sub_action>summary</sub_action>
+        <search_type>jobID</search_type>
+        <search_value>%(jobid)d</search_value>
+        <search_value2></search_value2>""" % {'jobid': job_id}
+
+        xml_response = self.make_call(data)
+
+        summary = xml_response.find('.//emailSummary')
+        s = {}
+        for node in summary:
+            s[node.tag] = node.text if node.text else ''
+
+        return s
+
+    def tracking_retrieve_unsubscribes(self, start_date, end_date):
+        '''
+        Retrieves the subscribers in your account who unsubscribed via an email job send during a specific period.
+        '''
+
+        data = """
+        <system_name>tracking-channel</system_name>
+        <action>retrieve</action>
+        <sub_action>unsubscribe</sub_action>
+        <search_type>daterange</search_type>
+        <search_value>%(startdate)s</search_value>
+        <search_value2>%(enddate)s</search_value2>""" % {'startdate': start_date, 'enddate': end_date}
+
+        xml_response = self.make_call(data)
+
+        unsubscribers = []
+        for unsubscriber in xml_response.findall('.//subscriber'):
+            s = {
+                'email_address': unsubscriber.find('Email__Address').text,
+                'name': unsubscriber.find('Full__Name').text if unsubscriber.find('Full__Name') else '',
+                'email_type': unsubscriber.find('Email__Type').text if unsubscriber.find('Email__Type').text else '',
+                'unsub_date_time': unsubscriber.find('date').text,
+                'interest': unsubscriber.find('interest').text,
+            }
+        unsubscribers.append(s)
+
+        return unsubscribers
+
+
     def make_call(self, data):
         xml = """<?xml version="1.0" ?>
         <exacttarget>
@@ -450,7 +733,8 @@ class ExactTargetConnection(object):
                 response = urllib2.urlopen(req, timeout=self.timeout)
         except urllib2.URLError:
             self.error = "Response timed out";
-            
+            raise ConnectionError("Error: %s while waiting for response from ExactTarget (maybe a higher value for timeout is required?)" % self.error)
+        
         content = response.read()
         
         try:
