@@ -23,7 +23,7 @@ except ImportError:
                 except ImportError:
                     print("Failed to import ElementTree from any known place")
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 ENDPOINTS = {
     'default': 'https://api.dc1.exacttarget.com/integrate.aspx',
