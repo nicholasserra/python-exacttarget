@@ -656,6 +656,7 @@ class ExactTargetConnection(object):
         Retrieves summarized tracking data for an email send.
 
         You may have additional functionality enabled in your account to search via event_id; swap the search_type to event_id.
+        Note: This only works for using job_send with test_send as 'false'; otherwise you get an error 47: Results not found from ExactTarget.
         '''
 
         data = """
