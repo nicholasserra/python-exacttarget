@@ -590,7 +590,7 @@ class ExactTargetConnection(object):
             <list>%(listid)d</list>
         </lists>
         <suppress></suppress>
-        <test_send>true</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id}
+        <test_send>%(test_send)s</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id, 'test_send': test_send}
 
         xml_response = self.make_call(data)
         job_id = xml_response.find('.//job_description')
