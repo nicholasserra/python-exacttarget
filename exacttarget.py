@@ -590,7 +590,7 @@ class ExactTargetConnection(object):
             <list>%(listid)d</list>
         </lists>
         <suppress></suppress>
-        <test_send>true</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id}
+        <test_send>%(test_send)s</test_send>""" % {'emailid': email_id, 'from_name': from_name, 'from_email': from_email, 'multipart_mime': multipart_mime, 'track_links': track_links, 'send_date': send_date, 'listid': list_id, 'test_send': test_send}
 
         xml_response = self.make_call(data)
         job_id = xml_response.find('.//job_description')
@@ -656,6 +656,7 @@ class ExactTargetConnection(object):
         Retrieves summarized tracking data for an email send.
 
         You may have additional functionality enabled in your account to search via event_id; swap the search_type to event_id.
+        Note: This only works for using job_send with test_send as 'false'; otherwise you get an error 47: Results not found from ExactTarget.
         '''
 
         data = """
